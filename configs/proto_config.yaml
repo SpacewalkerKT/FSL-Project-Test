@@ -1,0 +1,120 @@
+# -----------------------------------------------------------------------------
+# 实验配置文件 (Experiment Configuration File)
+# -----------------------------------------------------------------------------
+# 此文件用于定义实验的所有可配置参数，方便管理和复现实验。
+# 通过修改此文件中的值，可以改变实验的行为而无需修改代码。
+# -----------------------------------------------------------------------------
+
+experiment_name: "ProtoNet_TimeSeries_基线_CPU_详细注释版"
+# 实验的唯一标识名称。
+# 这个名称会用于创建 TensorBoard 日志的子目录，方便区分不同的实验运行。
+# 建议命名具有描述性，例如包含模型类型、数据集、关键参数等。
+
+# --- Reproducibility (可复现性控制) ---
+random_seed: 42
+# 用于初始化所有随机数生成器的种子。
+# 设置固定的随机种子可以确保实验结果的可复现性，即在相同配置和代码下多次运行能得到相同的结果。
+# 这对于调试和验证实验结果非常重要。
+
+# --- Data parameters (数据相关参数) ---
+data:
+  incident_path: "data/incident.xlsx"     # 【必需】包含事件（异常）样本的 Excel 文件路径。
+  before_path: "data/common_before.xlsx"  # 【必需】包含事件发生前正常样本的 Excel 文件路径。
+  after_path: "data/common_after.xlsx"    # 【必需】包含事件发生后正常样本的 Excel 文件路径。
+
+  seq_len: 24                             # 【重要】定义从原始数据点中提取的时间序列片段的长度。
+                                          # 例如，如果原始数据是每小时一个点，seq_len=24 表示每个序列片段代表一天的数据。
+                                          # 这个值需要根据你数据的特性和任务需求来设定。
+
+  train_split_ratio: 0.7                  # 训练集划分比例。用于从 `FewShotDataset` 生成的“总任务池”中划分一部分用于训练。
+                                          # 例如，0.7 表示 70% 的“任务索引”分配给训练 DataLoader。
+  val_split_ratio: 0.15                   # 验证集划分比例。例如，0.15 表示 15% 的“任务索引”分配给验证 DataLoader。
+                                          # 测试集将使用剩余的比例 (1 - train_split_ratio - val_split_ratio)。
+
+                                          # 注意事项:
+                                          # 1. 这里的划分是基于 `FewShotDataset` 中 `num_tasks_per_epoch` 定义的“任务索引池”进行的，
+                                          #    而不是严格意义上对原始数据点或原始类别的划分。
+                                          # 2. 对于严谨的小样本学习 (FSL) 研究，元训练集、元验证集和元测试集通常需要包含 *完全不相交的类别*。
+                                          #    当前实现为了简化，假设所有任务都从相同的类别池（正常/异常）中采样序列。
+                                          #    如果你的研究需要严格的类别不相交划分，你需要修改数据处理和数据集生成逻辑。
+
+# --- Few-shot task parameters (小样本任务定义参数) ---
+# 这些参数定义了 `FewShotDataset` 如何构建每个小样本学习任务 (episode)。
+fsl_task:
+  n_way: 2    # 【重要】N-Way: 每个任务中包含的类别数量。
+              # 对于你的二分类（正常/异常）问题，这里固定为 2。
+              # 如果未来扩展到多类别小样本问题，可以修改此值。
+  k_shot: 5   # 【重要】K-Shot: 每个类别在支持集 (support set) 中的样本数量。
+              # 例如，5-shot 表示每个类别提供 5 个带标签的样本供模型学习。
+  n_query: 5  # 【重要】N-Query: 每个类别在查询集 (query set) 中的样本数量。
+              # 模型需要对这 N*Q 个查询样本进行预测，并据此计算损失和准确率。
+
+# --- Encoder parameters (编码器模型参数) ---
+# 定义了用于将时间序列片段转换为特征向量的编码器模型的具体配置。
+encoder:
+  type: "TimeSeriesTransformer" # 指定要使用的编码器类型。
+                                # 在 `main.py` 中会根据此类型加载相应的编码器类。
+                                # 如果你添加了新的编码器 (如 CNNEncoder)，可以修改此值。
+
+  feature_dim: null             # 【动态确定】输入特征的维度。
+                                # 这个值将由 `datasets/dataloaders.py` 中的 `get_dataloaders` 函数
+                                # 在加载数据后自动从数据中推断并填充，无需手动设置。
+
+  hidden_dim: 128               # Transformer 模型的内部隐藏维度 (d_model)。
+                                # 影响模型的容量和计算复杂度。
+  num_layers: 4                 # Transformer 编码器中 EncoderLayer 的层数。
+                                # 层数越多，模型表达能力越强，但也更容易过拟合且计算量更大。
+  nhead: 8                      # Transformer 中多头注意力机制 (Multi-Head Attention) 的头数。
+                                # 需要能被 `hidden_dim` 整除 (`hidden_dim % nhead == 0`)。
+  dropout: 0.1                  # 在 Transformer 各层中使用的 Dropout 概率。
+                                # 用于正则化，防止过拟合。
+
+# --- Method parameters (小样本学习方法参数) ---
+# 定义了所选的小样本学习算法的具体配置。
+method:
+  type: "PrototypicalNetwork"   # 指定要使用的小样本学习算法类型。
+                                # 在 `main.py` 中会根据此类型加载相应的方法类。
+                                # 如果你实现了 MAML，可以将此值改为 "MAML"。
+  # 如果 "PrototypicalNetwork" 或其他方法有特定参数，可以在这里添加，
+  # 例如:
+  # distance_metric: "euclidean" # 原型网络中使用的距离度量
+
+# --- Training parameters (训练过程控制参数) ---
+training:
+  optimizer: "Adam"             # 指定优化器的类型。目前支持 "Adam"。
+                                # 未来可以扩展支持 "SGD", "AdamW" 等。
+  learning_rate: 0.0005         # 优化器的初始学习率。
+                                # 这是学习率预热结束后的目标学习率，也是学习率调度器的起始学习率。
+  epochs: 50                    # 训练的最大轮数 (epochs)。
+                                # 由于有早停机制，实际训练轮数可能小于此值。
+  batch_size: 4                 # 元批次大小 (Meta-batch size)。
+                                # 指的是在单次梯度更新中，同时处理的小样本任务 (episodes) 的数量。
+  warmup_steps: 1000            # 学习率线性预热的步数 (optimizer steps / batches)。
+                                # 在训练开始的前 `warmup_steps` 步，学习率从0线性增加到 `learning_rate`。
+                                # 有助于稳定训练初期的模型更新。
+  grad_clip_norm: 1.0           # 梯度裁剪的范数阈值。
+                                # 如果梯度的L2范数超过此值，则对其进行缩放。用于防止梯度爆炸。
+                                # 设置为 0 或负数可以禁用梯度裁剪。
+  early_stopping:               # 早停法 (Early Stopping) 相关参数。
+    patience: 10                # 容忍验证损失 (val_loss) 连续多少个 epoch 没有改善（即没有降低至少 `min_delta`）。
+                                # 达到此限制后，训练将提前停止。
+    min_delta: 0.00001          # (1e-5) 被认为是验证损失有“显著”改善的最小变化量。
+                                # 用于防止因非常微小的、可能是噪声引起的损失下降而重置耐心计数器。
+
+  lr_scheduler:                 # 学习率调度器 (ReduceLROnPlateau) 相关参数。
+    patience: 5                 # 学习率调度器的耐心值。当验证损失连续 `patience` 个 epoch 没有改善时，
+                                # 优化器的学习率将乘以 `factor`。这个patience和早停的patience是独立的。
+    factor: 0.5                 # 学习率衰减因子。例如，0.5 表示学习率减半。
+
+# --- Evaluation parameters (最终评估参数) ---
+# 定义了在训练结束后，在测试集上进行最终性能评估时的参数。
+evaluation:
+  num_test_episodes: 600        # 在测试集上采样并评估的小样本任务 (episodes) 的数量。
+                                # 评估结果将是这 `num_test_episodes` 个任务的平均准确率和置信区间。
+                                # 数量越多，评估结果越稳定，但耗时也越长。
+
+# --- Device Configuration (设备配置) ---
+device: "auto"                  # 指定模型训练和评估的设备。
+                                # "auto": 程序将自动检测是否存在可用的 CUDA GPU，如果存在则使用 GPU，否则使用 CPU。
+                                # "cuda": 强制使用 GPU (如果可用)。
+                                # "cpu": 强制使用 CPU。
