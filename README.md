@@ -16,29 +16,54 @@ FSL-Project-Test
 
 ## 项目简介
 
-本项目是对FSL-Traffic仓库的代码进行模块化尝试的测试仓库，主要是验证代码可行性，成品会同步到FSL-Traffic仓库中。
+本项目是对FSL-Traffic仓库的代码进行模块化尝试的测试仓库，主要是验证代码可行性，成品会同步到FSL-Traffic仓库中
 
 
 
 ## 目录结构
 
 ```plaintext
-<仓库根目录>/
-├── configs/            # 配置文件（YAML）
-├── data/               # 原始或预处理数据集
-├── datasets/           # 自定义数据集定义
-├── encoders/           # 编码器模型实现
-├── methods/            # 小样本学习方法实现
-├── runs/               # 训练及评估输出结果
-├── training/           # 训练脚本及辅助工具
-├── utils/              # 工具模块（指标计算、辅助函数等）
-├── project_test/       # 实验性/原型代码
-├── main.py             # 训练与评估入口脚本
-├── requirements.txt    # Python 依赖列表
-└── README.md           # 项目说明文档
-```
+project_test/
+│
+├── configs/                    # 配置文件（YAML）
+│   └── proto_config.yaml
+│
+├── data/                       # 原始或预处理数据集
+│   ├── incident.xlsx
+│   ├── common_before.xlsx
+│   └── common_after.xlsx
+│
+├── datasets/                   # 自定义数据集定义
+│   ├── __init__.py
+│   ├── data_processor.py       # 数据加载和预处理
+│   ├── few_shot_dataset.py     # 小样本任务生成的数据集类
+│   └── dataloaders.py          # 创建 DataLoader 的函数
+│
+├── encoders/                   # 编码器模型实现
+│   ├── __init__.py
+│   ├── base_encoder.py
+│   └── time_series_encoder.py
+│
+├── methods/                    # 小样本学习方法模型
+│   ├── __init__.py
+│   ├── base_fsl_method.py
+│   └── prototypical_network.py
+│
+├── runs/                       # TensorBoard 日志保存目录
+│
+├── training/                   # 训练脚本及辅助工具
+│   ├── __init__.py
+│   └── trainer.py              # 训练器类
+│
+├── utils/                      # 工具模块（指标计算、辅助函数等）
+│   ├── __init__.py
+│   ├── metrics.py              # 评估指标计算
+│   └── torch_utils.py
+│
+└── main.py                     # 主程序入口
+└── README.md                   # 项目说明文档
 
-请根据实际项目目录进行调整。
+```
 
 
 ## 配置说明
